@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { submitToGoogleSheet, SHEET_CONFIG } from "@/utils/googleSheetsAPI";
 
 const Contact = () => {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -21,18 +23,46 @@ const Contact = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Message sent!",
-      description: "Thanks for reaching out. We'll get back to you soon.",
-    });
-    setFormData({
-      name: "",
-      email: "",
-      subject: "",
-      message: "",
-    });
+    setIsSubmitting(true);
+
+    try {
+      const result = await submitToGoogleSheet(
+        formData,
+        SHEET_CONFIG.CONTACT_FORM.SHEET_ID,
+        SHEET_CONFIG.CONTACT_FORM.SHEET_NAME
+      );
+
+      if (result.success) {
+        toast({
+          title: "Message sent!",
+          description: "Thanks for reaching out. We'll get back to you soon.",
+        });
+        
+        // Reset form
+        setFormData({
+          name: "",
+          email: "",
+          subject: "",
+          message: "",
+        });
+      } else {
+        toast({
+          title: "Something went wrong",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send your message. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -94,7 +124,13 @@ const Contact = () => {
                   />
                 </div>
 
-                <Button type="submit" className="w-full">Send Message</Button>
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Sending..." : "Send Message"}
+                </Button>
               </form>
             </Card>
           </div>

@@ -6,9 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { submitToGoogleSheet, SHEET_CONFIG } from "@/utils/googleSheetsAPI";
 
 const Custom = () => {
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -30,12 +32,61 @@ const Custom = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Custom order submitted!",
-      description: "We'll get back to you shortly about your custom sticker request.",
-    });
+    setIsSubmitting(true);
+
+    try {
+      // Prepare form data with file info
+      const dataToSubmit = {
+        ...formData,
+        file_name: file ? file.name : null,
+        file_type: file ? file.type : null,
+        file_size: file ? `${Math.round(file.size / 1024)} KB` : null,
+      };
+
+      const result = await submitToGoogleSheet(
+        dataToSubmit,
+        SHEET_CONFIG.CUSTOM_ORDER_FORM.SHEET_ID,
+        SHEET_CONFIG.CUSTOM_ORDER_FORM.SHEET_NAME
+      );
+
+      if (result.success) {
+        toast({
+          title: "Custom order submitted!",
+          description: "We'll get back to you shortly about your custom sticker request.",
+        });
+        
+        // Reset form
+        setFormData({
+          name: "",
+          email: "",
+          size: "",
+          quantity: "",
+          shape: "",
+          notes: "",
+        });
+        setFile(null);
+        
+        // Reset file input
+        const fileInput = document.getElementById('design') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+      } else {
+        toast({
+          title: "Something went wrong",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send your custom order. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -87,6 +138,7 @@ const Custom = () => {
               <Label htmlFor="size">Sticker Size</Label>
               <Select
                 onValueChange={(value) => setFormData({ ...formData, size: value })}
+                value={formData.size}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select size" />
@@ -116,6 +168,7 @@ const Custom = () => {
               <Label htmlFor="shape">Sticker Shape</Label>
               <Select
                 onValueChange={(value) => setFormData({ ...formData, shape: value })}
+                value={formData.shape}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select shape" />
@@ -155,7 +208,13 @@ const Custom = () => {
               />
             </div>
 
-            <Button type="submit" className="w-full">Submit Custom Order</Button>
+            <Button 
+              type="submit" 
+              className="w-full"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Submitting..." : "Submit Custom Order"}
+            </Button>
           </form>
         </div>
 
